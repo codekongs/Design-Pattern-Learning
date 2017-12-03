@@ -2,6 +2,7 @@ package cn.codekong.imageloader.util;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.Log;
 import android.util.LruCache;
 import android.widget.ImageView;
 
@@ -21,11 +22,11 @@ public class ImageLoader {
     /**
      * 图片缓存
      */
-    LruCache<String, Bitmap> mImageCache;
+    private LruCache<String, Bitmap> mImageCache;
     /**
      * 线程池,线程数量为CPU数量
      */
-    ExecutorService mExecutorService = Executors.newFixedThreadPool(
+    private ExecutorService mExecutorService = Executors.newFixedThreadPool(
             Runtime.getRuntime().availableProcessors());
 
     public ImageLoader() {
@@ -36,11 +37,11 @@ public class ImageLoader {
         //计算可使用的最大内存
         final int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
         //取四分之一可用内存作为缓存
-        final int cacheSize = maxMemory / 4;
+        final int cacheSize = maxMemory / 8;
         mImageCache = new LruCache<String, Bitmap>(cacheSize){
             @Override
             protected int sizeOf(String key, Bitmap bitmap) {
-                return bitmap.getRowBytes() * bitmap.getHeight() / 1024;
+                return bitmap.getByteCount() / 1024;
             }
         };
     }
@@ -49,20 +50,27 @@ public class ImageLoader {
         Bitmap bitmap = mImageCache.get(url);
         if (bitmap != null){
             imageView.setImageBitmap(bitmap);
+            Log.d("HHHHH", "getImage: 从缓存读取图片...");
             return;
         }
         imageView.setTag(url);
         mExecutorService.submit(new Runnable() {
             @Override
             public void run() {
-                Bitmap bitmp = downloadImage(url);
-                if (bitmp == null){
+                final Bitmap imageBitmap = downloadImage(url);
+                if (imageBitmap == null){
                     return;
                 }
                 if (imageView.getTag().equals(url)){
-                    imageView.setImageBitmap(bitmp);
+                    imageView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            imageView.setImageBitmap(imageBitmap);
+                            mImageCache.put(url, imageBitmap);
+                            Log.d("HHHHH", "cache: 缓存图片完成...");
+                        }
+                    });
                 }
-                mImageCache.put(url, bitmp);
             }
         });
     }
@@ -72,7 +80,9 @@ public class ImageLoader {
      * @param imageUrl 图片url
      * @return 图片
      */
-    private Bitmap downloadImage(String imageUrl) {
+    public Bitmap downloadImage(String imageUrl) {
+        Log.d("HHHHH", "downloadImage: size " + mImageCache.size());
+        Log.d("HHHHH", "downloadImage: 正在下载图片...");
         Bitmap bitmap = null;
         try {
             URL url = new URL(imageUrl);
@@ -84,6 +94,7 @@ public class ImageLoader {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        Log.d("HHHHH", "downloadImage: 下载完成...");
         return bitmap;
     }
 }
