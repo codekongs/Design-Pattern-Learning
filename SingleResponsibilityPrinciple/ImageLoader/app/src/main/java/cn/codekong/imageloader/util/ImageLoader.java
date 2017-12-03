@@ -61,6 +61,7 @@ public class ImageLoader {
                 if (imageBitmap == null){
                     return;
                 }
+
                 if (imageView.getTag().equals(url)){
                     imageView.post(new Runnable() {
                         @Override
